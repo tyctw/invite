@@ -4,8 +4,7 @@
   <meta charset="UTF-8">
   <title>會考落點分析邀請碼</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6966991656561179"
-     crossorigin="anonymous"></script>
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6966991656561179" crossorigin="anonymous"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Fredoka+One&family=Poppins:wght@700&display=swap');
@@ -102,7 +101,7 @@
       position: relative;
     }
 
-    /* 標題設計 (仿照圖片左上角的 Icon 帶標題) */
+    /* 標題設計 */
     .header-title {
       display: flex;
       align-items: center;
@@ -254,7 +253,7 @@
       box-shadow: var(--box-shadow-active);
     }
 
-    /* 資訊區塊 (帶有浮水印效果) */
+    /* 資訊區塊 */
     .info-section {
       background: var(--white-bg);
       border-radius: 16px;
@@ -266,7 +265,6 @@
       z-index: 1;
     }
 
-    /* 仿照圖片右側的超大浮水印圖示 */
     .info-section::after {
       content: '\f05a'; /* FontAwesome info icon */
       font-family: 'Font Awesome 6 Free';
@@ -661,6 +659,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script>
     // ========== 核心邏輯區 ==========
+    // 全域看門狗旗標，防止倒數邊緣多重請求
+    let isUpdatingBackend = false; 
+
     function updateInvitationCode() {
       const codeEl = document.getElementById('invitationCode');
       codeEl.innerHTML = '<div class="spinner"></div>';
@@ -704,7 +705,7 @@
         codeEl.appendChild(digitContainer);
         setTimeout(() => {
           const span = digitContainer.querySelector('.digit');
-          span.classList.add('digit-animation');
+          if (span) span.classList.add('digit-animation');
         }, i * 80); 
       }
     }
@@ -722,14 +723,27 @@
       let progress = ((hourDuration - timeLeft) / hourDuration) * 100;
       document.getElementById('progressBar').style.width = Math.min(100, Math.max(0, progress)) + '%';
 
-      if (timeLeft <= 1000 && timeLeft > 0) { setTimeout(updateInvitationCode, 2000); }
+      // 修正：增加狀態鎖，確保倒數至 0 時一秒之內只執行一次請求
+      if (timeLeft <= 1000 && timeLeft > 0 && !isUpdatingBackend) { 
+        isUpdatingBackend = true;
+        setTimeout(() => {
+          updateInvitationCode();
+          isUpdatingBackend = false; 
+        }, 2000); 
+      }
     }
 
     // ========== 互動與功能區 ==========
+    function getRawCode() {
+      let code = "";
+      document.querySelectorAll('.digit').forEach(el => code += el.textContent);
+      if(!code) code = document.getElementById('invitationCode').textContent.trim();
+      return code;
+    }
+
     function copyInvitationCode() {
-        let code = "";
-        document.querySelectorAll('.digit').forEach(el => code += el.textContent);
-        if(!code) code = document.getElementById('invitationCode').textContent;
+        const code = getRawCode();
+        if(code === "載入失敗" || code === "") return;
         
         navigator.clipboard.writeText(code).then(() => showToast("已成功複製代碼！"))
           .catch(() => {
@@ -757,15 +771,20 @@
       const qrDiv = document.getElementById("qrCode");
       const downloadContainer = document.getElementById("qrDownloadContainer");
       
-      let code = "";
-      document.querySelectorAll('.digit').forEach(el => code += el.textContent);
-      if(!code) code = document.getElementById('invitationCode').textContent;
+      const code = getRawCode();
+      if(code === "載入失敗" || code === "") {
+        showToast("尚未取得有效代碼");
+        return;
+      }
+      
+      // 修正：將 QR Code 的掃描內容改為直接一鍵登入的參數連結，提供更好的使用者體驗
+      const qrTargetUrl = `https://tyctw.github.io/spare/?invite=${code}`;
       
       qrDiv.innerHTML = '';
       downloadContainer.innerHTML = '';
       
       new QRCode(qrDiv, {
-        text: code,
+        text: qrTargetUrl,
         width: 180,
         height: 180,
         colorDark: document.body.classList.contains('dark-mode') ? "#f9fafb" : "#1e1e2f",
@@ -807,9 +826,8 @@
     }
 
     function shareInvitationCode() {
-      let code = "";
-      document.querySelectorAll('.digit').forEach(el => code += el.textContent);
-      if(!code) code = document.getElementById('invitationCode').textContent;
+      const code = getRawCode();
+      if(code === "載入失敗" || code === "") return;
       
       const shareUrl = `https://tyctw.github.io/spare/?invite=${code}`;
       
@@ -821,7 +839,7 @@
         }).catch(err => console.log('分享取消'));
       } else {
         copyInvitationCode();
-        setTimeout(() => alert('瀏覽器不支援分享，已為您複製邀請碼！'), 300);
+        setTimeout(() => alert('瀏覽器不支援直接分享，已自動為您複製邀請碼連結！\n連結：' + shareUrl), 300);
       }
     }
 
@@ -861,7 +879,7 @@
     initDarkMode();
     initHelp();
     
-    document.addEventListener('contextmenu', e => e.preventDefault());
+    // 修正：移除了原先底部的禁用右鍵滑鼠事件，確保手機版長按複製與輔助工具能正常體驗
   </script>
 </body>
 </html>
